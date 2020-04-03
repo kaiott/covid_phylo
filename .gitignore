@@ -1,0 +1,7 @@
+# config files in src/__pycache__
+*.pyc
+
+# cached files
+*.bak
+*.dat
+*.dir
