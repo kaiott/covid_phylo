@@ -1,0 +1,8 @@
+bio==0.1.0
+biopython==1.76
+certifi==2020.4.5.1
+chardet==3.0.4
+idna==2.9
+numpy==1.18.2
+requests==2.23.0
+urllib3==1.25.8

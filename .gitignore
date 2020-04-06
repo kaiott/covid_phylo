@@ -4,4 +4,7 @@
 # cached files
 *.bak
 *.dat
-*.dir
+*.dir.idea/
+.idea/
+covid_phylo_data/
+venv/

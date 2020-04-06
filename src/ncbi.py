@@ -1,13 +1,10 @@
 
 import config
-
 from pprint import pprint
 import time
 import shelve
 import io
-
 import requests
-
 from Bio import SeqIO
 
 ENTREZ_COVID_SEARCH_URL = 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=nucleotide&term=txid2697049[Organism:noexp]&retmode=json&retmax=10000'
