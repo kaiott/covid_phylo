@@ -3,6 +3,29 @@ import re
 from pathlib import Path
 import ncbi
 import config
+from Bio.Align.Applications import MafftCommandline
+
+
+def mafft(origname=None, destname=None, route=None):
+    """
+    DESCRIPTION:
+    A function to interactuate with MAFFT through the system. To align the sequences in a given file.
+    :param origname: [string] filename with all sequences in FASTA format.
+    :param destname: [string] filename to store the aligned sequences.
+    :param destname: [string] route to mafft binary.
+    :return: Generates the file with the alignments of the sequences of the given file.
+    """
+    # Obtain paths
+    fasta_path = Path(Path(__file__).parent.absolute()).parent.absolute() / Path('covid_phylo_data/fasta')
+    origname = fasta_path / origname
+    destname = fasta_path / destname
+    # Execute mafft
+    mafft_cline = MafftCommandline(route, input=origname)
+    stdout, stderr = mafft_cline()
+    # Write result into file
+    file = open(destname, 'w')
+    file.write(stdout)
+    file.close()
 
 
 def records_to_fasta(records, fasta_dir=None, filename='records.txt'):
@@ -13,7 +36,7 @@ def records_to_fasta(records, fasta_dir=None, filename='records.txt'):
     :param records: [list] records read.
     :param fasta_dir: [pathlib] route to the folder in which the sequences are to be stored.
     :param filename: [string] name of the file in which the sequences are stores.
-    :return:
+    :return: Generates the file with the records.
     """
     # Check we have records or not
     if records is None:
@@ -43,7 +66,10 @@ def select_fasta(orf=None, origname=None, destname=None):
     DESCRIPTION:
     Given a FASTA file with all the information, generates another FASTA with only the sequences of the selected part of
     the genome.
-    :return:
+    :param orf: [string] sequence of letters indicating the ORF.
+    :param origname: [string] filename with all sequences in FASTA format.
+    :param destname: [string] filename to stores the selected sequences in fasta format. In the same folder.
+    :return: Generates the file with the records fo the select region.
     """
     # Take for granted the location of all fasta files
     fasta_path = Path('covid_phylo_data/fasta')
@@ -75,13 +101,15 @@ def main():
     """
     DESCRIPTION:
     Main method of the program.
-    :return: None. Execution of the instructions.
+    :return: None.
     """
     result = ncbi.get_all_covid_nucleotide_seqs(cache_dir=config.CACHE_DIR)
     records = result.get('seqrecords')
     records_to_fasta(records, config.FASTA_DIR, 'IUPACAmbiguousDNA.txt')
+    select_fasta(orf='S', origname='IUPACAmbiguousDNA.txt', destname='S_gene_seq.fasta')
+    mafft_route = '/usr/bin/mafft'
+    mafft(origname='S_gene_seq.fasta',  destname='S_gene_align.fasta', route=mafft_route)
 
 
 if __name__ == '__main__':
-    # main()
-    select_fasta(orf='N', origname='IUPACAmbiguousDNA.txt', destname='N_gene_seq.txt')
+    main()
