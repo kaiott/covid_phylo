@@ -1,30 +1,74 @@
-
+import os
+import re
+from pathlib import Path
 import ncbi
 import config
 
 
 def records_to_fasta(records, fasta_dir=None, filename='records.txt'):
-	if records is None:
-		return None
-	
-	fasta_result = {}
-	content = ''
-	for record in records:
-		fasta = record.format('fasta')
-		if fasta_dir is not None:
-			content += fasta
-		
-		[header_line, sequence] = fasta.split('\n', 1)
-		print(header_line)
-		fasta_result[header_line] = sequence
+    """
+    DESCRIPTION:
+    A function to change between a set of records in a list and a normalized fasta file with all the sequences. Be
+    notice that all data is downloaded. Not specific fragments.
+    :param records: [list] records read.
+    :param fasta_dir: [pathlib] route to the folder in which the sequences are to be stored.
+    :param filename: [string] name of the file in which the sequences are stores.
+    :return:
+    """
+    # Check we have records or not
+    if records is None:
+        return None
+    fasta_result = {}
+    content = ''
+    # Save all the records in fasta format in a string
+    for record in records:
+        fasta = record.format('fasta')
+        if fasta_dir is not None:
+            content += fasta
 
-	if fasta_dir is not None:
-		fasta_dir.mkdir(exist_ok=True)
-		f = open(fasta_dir / filename, 'w')
-		f.write(content)
-		f.close()
+        [header_line, sequence] = fasta.split('\n', 1)
+        fasta_result[header_line] = sequence
+    # Write the string in a file
+    if fasta_dir is not None:
+        fasta_dir.mkdir(exist_ok=True)
+        f = open(fasta_dir / filename, 'w')
+        f.write(content)
+        f.close()
 
-	return fasta_result
+    return fasta_result
+
+
+def select_fasta(orf=None, origname=None, destname=None):
+    """
+    DESCRIPTION:
+    Given a FASTA file with all the information, generates another FASTA with only the sequences of the selected part of
+    the genome.
+    :return:
+    """
+    # Take for granted the location of all fasta files
+    fasta_path = Path('covid_phylo_data/fasta')
+    or_path = Path(Path(__file__).parent.absolute()).parent.absolute()
+
+    # Read from a file, select and write into the other file
+    file_r = open(or_path / fasta_path / origname)
+    file_w = open(or_path / fasta_path / destname, 'w')
+    records = file_r.read()
+    records = records.split('>')
+    for record in records:
+        record = record.split('\n')
+        header = re.split(' |, ', record[0])
+        orf_a = '(' + orf + ')'
+        if orf not in header and orf_a not in header or ';' in record[0]:
+            continue
+        else:
+            header = '\n' + '>' + record[0]
+            seq = ''.join(record[1::])
+            n = 60
+            seq = '\n' + '\n'.join([seq[i:i+n] if n+i < len(seq) else seq[i::] for i in range(0, len(seq), n)])
+            file_w.write(header)
+            file_w.write(seq)
+    file_r.close()
+    file_w.close()
 
 
 def main():
@@ -39,4 +83,5 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    # main()
+    select_fasta(orf='N', origname='IUPACAmbiguousDNA.txt', destname='N_gene_seq.txt')
