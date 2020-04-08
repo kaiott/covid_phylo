@@ -1,4 +1,3 @@
-
 import config
 from pprint import pprint
 import time
@@ -13,7 +12,6 @@ ENTREZ_NUCL_DOWNLOAD_URL = 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch
 
 
 def _get_raw_sequence(uid, cache_dir=None, format='gb'):
-
 	if cache_dir is not None:
 		shelve_path = cache_dir / config.RAW_SEQUENCE_SHELVE_FNAME
 		shelved_raw_seqs = shelve.open(str(shelve_path))
@@ -39,7 +37,6 @@ def _get_raw_sequence(uid, cache_dir=None, format='gb'):
 
 
 def get_all_covid_nucleotide_seqs(cache_dir=None):
-
 	if cache_dir is not None:
 		cache_dir.mkdir(exist_ok=True)
 
@@ -63,10 +60,10 @@ def get_all_covid_nucleotide_seqs(cache_dir=None):
 		raw_seq = _get_raw_sequence(uid, cache_dir=cache_dir, format='gb')
 		fhand = io.StringIO(raw_seq)
 		record = list(SeqIO.parse(fhand, 'gb'))[0]
-		seq_records.append(record) # used to be .append(seq_records) resulting in the list containing itself an exponetial number of times...
+		seq_records.append(
+			record)  # used to be .append(seq_records) resulting in the list containing itself an exponetial number of times...
 
 	search_result = {'request_timestamp': time.time(),
 					 'seqrecords': seq_records
-					}
+					 }
 	return search_result
-
