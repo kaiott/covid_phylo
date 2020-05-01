@@ -1,6 +1,6 @@
 import re
-import ncbi
-import config
+import os
+import ncbi, config, iqtree, ete
 from Bio.Align.Applications import MafftCommandline
 
 
@@ -17,10 +17,11 @@ def mafft(origname=None, destname=None, route=None):
 	origname = config.FASTA_DIR / origname
 	destname = config.FASTA_DIR / destname
 	# Execute mafft
+	print('Executing sequences alignment...')
 	mafft_cline = MafftCommandline(route, input=origname)
 	print('before cline')
 	stdout, stderr = mafft_cline()
-	print('after cline')
+	print('Alignment completed')
 	# Write result into file
 	file = open(destname, 'w')
 	file.write(stdout)
@@ -28,6 +29,7 @@ def mafft(origname=None, destname=None, route=None):
 	file = open(config.FASTA_DIR / 'derroutput', 'w')
 	file.write(stderr)
 	file.close()
+	print('Alignment saved')
 
 
 def filter_complete_genome(header_line):
@@ -91,25 +93,54 @@ def main():
 	print('retrieving records')
 	result = ncbi.get_all_covid_nucleotide_seqs(cache_dir=config.CACHE_DIR)
 	records = result.get('seqrecords')
+	
 	print('number of records retrieved: ' + str(len(records)))
 
 	# write the records to a file in the fasta format
 	print('writing as fasta')
 	max_used=400
-	input_fasta_file = 'complete_genomeDNA'
-	aligned_fasta_file = 'complete_gene_align'
+	origname = 'complete_genomeDNA'
+	destname = 'complete_gene_align'
 	if max_used is not None:
-		input_fasta_file += str(max_used)
-		aligned_fasta_file += str(max_used)
+		origname += str(max_used)
+		destname += str(max_used)
 
-	result = records_to_fasta(records, config.FASTA_DIR, input_fasta_file, filter_complete_genome, max_used=max_used)
+	result = records_to_fasta(records, config.FASTA_DIR, origname, filter_complete_genome, max_used=max_used)
 	print('numbers of records used: ' + str(len(result)))
 
 	# align the genomes using mafft
 	print('aligning with mafft')
-	mafft_route = '/usr/bin/mafft'
-	mafft(origname=input_fasta_file, destname=aligned_fasta_file, route=mafft_route)
-	print('alignment done')
+	if os.name == 'posix':
+		mafft_route = '/usr/bin/mafft'
+		if not os.path.exists(config.FASTA_DIR / destname):
+			print('Alignment not found in fasta folder')
+			print('Starting alignment')
+			mafft(origname=origname, destname=destname, route=mafft_route)
+			print('Alignment finished')
+		else:
+			print('Alignment found in fasta folder')
+	else:
+		pass
+
+	# iqtree visualizing tree	
+	print('Select the best alignments')
+	origname = destname[:]
+	destname = 'selection.txt'
+	n_genomes = 100
+	if not os.path.exists(config.TREE_DIR / destname.split('.')[0] / destname):
+		print('Creating selection file')
+		iqtree.align_selector(origname, destname, n_genomes)
+	print('Looking for tree inference')
+	if len(os.listdir(config.TREE_DIR / destname.split('.')[0])) < 2:
+		print('Tree not found in tree folder')
+		print('Starting tree inference')
+		iqtree.tree_creator(destname)
+		print('Inference finished')
+	else:
+		print('Tree found in tree folder')
+	print('Generating tree visualization')
+	tree_route = config.TREE_DIR / destname.split('.')[0]
+	ete.tree_viewer(tree_route)
 
 
 if __name__ == '__main__':
