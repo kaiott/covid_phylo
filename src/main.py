@@ -18,10 +18,15 @@ def mafft(origname=None, destname=None, route=None):
 	destname = config.FASTA_DIR / destname
 	# Execute mafft
 	mafft_cline = MafftCommandline(route, input=origname)
+	print('before cline')
 	stdout, stderr = mafft_cline()
+	print('after cline')
 	# Write result into file
 	file = open(destname, 'w')
 	file.write(stdout)
+	file.close()
+	file = open(config.FASTA_DIR / 'derroutput', 'w')
+	file.write(stderr)
 	file.close()
 
 
@@ -39,7 +44,7 @@ def filter_complete_genome(header_line):
 	return False
 
 
-def records_to_fasta(records, fasta_dir=None, filename='records.txt', header_filter=None):
+def records_to_fasta(records, fasta_dir=None, filename='records.txt', header_filter=None, max_used=None):
 	"""
 	DESCRIPTION:
 	A function to change between a set of records in a list and a normalized fasta file with all the sequences. Be
@@ -55,8 +60,10 @@ def records_to_fasta(records, fasta_dir=None, filename='records.txt', header_fil
 		return None
 	fasta_result = {}
 	content = ''
-	# Save all the records in fasta format in a string
+	# Save all or maximal max_used records in fasta format in a string
 	for record in records:
+		if max_used is not None and len(fasta_result) >= max_used:
+			break
 		fasta = record.format('fasta')
 		[header_line, sequence] = fasta.split('\n', 1)
 		# check if header_line passes the specified filter and only then add it to result and content of file
@@ -80,13 +87,29 @@ def main():
 	Main method of the program.
 	:return: None.
 	"""
+	# retrieve records from database or cache
+	print('retrieving records')
 	result = ncbi.get_all_covid_nucleotide_seqs(cache_dir=config.CACHE_DIR)
 	records = result.get('seqrecords')
-	records_to_fasta(records, config.FASTA_DIR, 'complete_genomeDNA.txt', filter_complete_genome)
-	# I commented this, because I don't have mafft installed (and even if I did, I think I'd get an error, because on
-	# Windows the paths are different, maybe use Pathlib to fix that
-	# mafft_route = '/usr/bin/mafft'
-	# mafft(origname='complete_genomeDNA.txt', destname='complete_gene_align.txt', route=mafft_route)
+	print('number of records retrieved: ' + str(len(records)))
+
+	# write the records to a file in the fasta format
+	print('writing as fasta')
+	max_used=400
+	input_fasta_file = 'complete_genomeDNA'
+	aligned_fasta_file = 'complete_gene_align'
+	if max_used is not None:
+		input_fasta_file += str(max_used)
+		aligned_fasta_file += str(max_used)
+
+	result = records_to_fasta(records, config.FASTA_DIR, input_fasta_file, filter_complete_genome, max_used=max_used)
+	print('numbers of records used: ' + str(len(result)))
+
+	# align the genomes using mafft
+	print('aligning with mafft')
+	mafft_route = '/usr/bin/mafft'
+	mafft(origname=input_fasta_file, destname=aligned_fasta_file, route=mafft_route)
+	print('alignment done')
 
 
 if __name__ == '__main__':

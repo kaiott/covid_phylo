@@ -49,6 +49,9 @@ def get_all_covid_nucleotide_seqs(cache_dir=None):
 	ncbi_search_result = response.json()['esearchresult']
 
 	n_seqs_found = int(ncbi_search_result['count'])
+
+	print('found ' + str(n_seqs_found) + ' sequences')
+
 	uids = ncbi_search_result['idlist']
 
 	if n_seqs_found > len(uids):
@@ -58,6 +61,7 @@ def get_all_covid_nucleotide_seqs(cache_dir=None):
 	seq_records = []
 	for uid in uids:
 		raw_seq = _get_raw_sequence(uid, cache_dir=cache_dir, format='gb')
+		print('retrieving record ' + str(len(seq_records)+1) + '/' + str(n_seqs_found))
 		fhand = io.StringIO(raw_seq)
 		record = list(SeqIO.parse(fhand, 'gb'))[0]
 		seq_records.append(
