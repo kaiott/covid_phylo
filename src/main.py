@@ -1,6 +1,6 @@
 import re
-import ncbi
-import config
+import os
+from src import ncbi, config, iqtree, ete
 from Bio.Align.Applications import MafftCommandline
 
 
@@ -17,12 +17,15 @@ def mafft(origname=None, destname=None, route=None):
 	origname = config.FASTA_DIR / origname
 	destname = config.FASTA_DIR / destname
 	# Execute mafft
+	print('Executing sequences alignment...')
 	mafft_cline = MafftCommandline(route, input=origname)
 	stdout, stderr = mafft_cline()
+	print('Alignment completed')
 	# Write result into file
 	file = open(destname, 'w')
 	file.write(stdout)
 	file.close()
+	print('Alignment saved')
 
 
 def filter_complete_genome(header_line):
@@ -85,8 +88,38 @@ def main():
 	records_to_fasta(records, config.FASTA_DIR, 'complete_genomeDNA.txt', filter_complete_genome)
 	# I commented this, because I don't have mafft installed (and even if I did, I think I'd get an error, because on
 	# Windows the paths are different, maybe use Pathlib to fix that
-	# mafft_route = '/usr/bin/mafft'
-	# mafft(origname='complete_genomeDNA.txt', destname='complete_gene_align.txt', route=mafft_route)
+	origname = 'complete_genomeDNA.txt'
+	destname = 'complete_gene_align.txt'
+	if os.name == 'posix':
+		mafft_route = '/usr/bin/mafft'
+		if not os.path.exists(config.FASTA_DIR / destname):
+			print('Alignment not found in fasta folder')
+			print('Starting alignment')
+			mafft(origname=origname, destname=destname, route=mafft_route)
+			print('Alignment finished')
+		else:
+			print('Alignment found in fasta folder')
+	else:
+		pass
+	print('Select the best alignments')
+	origname = destname[:]
+	destname = 'selection.txt'
+	n_genomes = 100
+	if not os.path.exists(config.TREE_DIR / destname.split('.')[0] / destname):
+		print('Creating selection file')
+		iqtree.align_selector(origname, destname, n_genomes)
+	print('Looking for tree inference')
+	if len(os.listdir(config.TREE_DIR / destname.split('.')[0])) < 2:
+		print('Tree not found in tree folder')
+		print('Starting tree inference')
+		iqtree.tree_creator(destname)
+		print('Inference finished')
+	else:
+		print('Tree found in tree folder')
+	print('Generating tree visualization')
+	tree_route = config.TREE_DIR / destname.split('.')[0]
+	ete.tree_viewer(tree_route)
+
 
 
 if __name__ == '__main__':

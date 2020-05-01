@@ -1,4 +1,4 @@
-import config
+from src import config
 from pprint import pprint
 import time
 import shelve
