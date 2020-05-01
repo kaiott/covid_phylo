@@ -1,6 +1,6 @@
 
 import os
-from src.config import MEDIA_DIR
+from config import MEDIA_DIR
 from ete3 import Tree, TreeStyle
 
 

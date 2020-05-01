@@ -1,6 +1,6 @@
 
 import os
-from src.config import MEDIA_DIR, TREE_DIR, FASTA_DIR
+from config import MEDIA_DIR, TREE_DIR, FASTA_DIR
 
 
 def tree_creator(selectname):

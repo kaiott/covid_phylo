@@ -1,6 +1,6 @@
 import re
 import os
-from src import ncbi, config, iqtree, ete
+import ncbi, config, iqtree, ete
 from Bio.Align.Applications import MafftCommandline
 
 
