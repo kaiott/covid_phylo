@@ -1,3 +1,4 @@
+import pathlib
 import re
 import os
 import ncbi, config, iqtree, ete
@@ -92,7 +93,7 @@ def main():
     destname = 'complete_gene_align.txt'
     if os.name == 'posix':
         mafft_route = '/usr/bin/mafft'
-        if not os.path.exists(config.FASTA_DIR / destname):
+        if not pathlib.Path.exists(config.FASTA_DIR / destname):
             print('Alignment not found in fasta folder')
             print('Starting alignment')
             mafft(origname=origname, destname=destname, route=mafft_route)
@@ -105,11 +106,12 @@ def main():
     origname = destname[:]
     destname = 'selection.txt'
     n_genomes = 100
-    if not os.path.exists(config.TREE_DIR / destname.split('.')[0] / destname):
+    if not pathlib.Path.exists(config.TREE_DIR / destname.split('.')[0] / destname):
         print('Creating selection file')
         iqtree.align_selector(origname, destname, n_genomes)
     print('Looking for tree inference')
-    if len(os.listdir(config.TREE_DIR / destname.split('.')[0])) < 2:
+    folder = pathlib.Path(config.TREE_DIR / destname.split('.')[0])
+    if len([x for x in folder.iterdir()]) < 2:
         print('Tree not found in tree folder')
         print('Starting tree inference')
         iqtree.tree_creator(destname)
