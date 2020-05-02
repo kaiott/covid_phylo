@@ -1,8 +1,18 @@
 import re
 import os
+import json
 import ncbi, config, iqtree, ete
+from datetime import datetime
 from Bio.Align.Applications import MafftCommandline
 
+
+
+def mafft_add(aligned_file, unaligned_file, output_file):
+	aligned_file = config.FASTA_DIR / aligned_file
+	unaligned_file = config.FASTA_DIR / unaligned_file
+	output_file = config.FASTA_DIR / output_file
+	command = f'mafft --add {unaligned_file} --reorder {aligned_file} > {output_file}'
+	os.system(command)
 
 def mafft(origname=None, destname=None, route=None):
 	"""
@@ -46,6 +56,70 @@ def filter_complete_genome(header_line):
 	return False
 
 
+def get_fasta_info(fasta_dir):
+	try:
+		with open(fasta_dir / 'alignment_information.txt', 'r') as file:
+			json_info = json.load(file)
+			return json_info['last_id'], json_info['aligned_ids']
+	except FileNotFoundError:
+		return None, None
+
+
+def write_new_records_to_fasta(records, file_id, fasta_dir=None, accounted_for=None, header_filter=None, max_used=None):
+	if records is None or file_id is None:
+		return None # or better raise some exception
+
+	fasta_result = {}
+	content = ''
+	if accounted_for is None:
+		new_accounted_for = []
+	else:
+		new_accounted_for = accounted_for[:]
+
+	for record in records:
+		if max_used is not None and len(fasta_result) >= max_used:
+			break
+		if accounted_for is not None and record.id in accounted_for:
+			# omitting this record, cause already accounted for
+			continue
+		fasta = record.format('fasta')
+		[header_line, sequence] = fasta.split('\n', 1)
+		if header_filter is None or header_filter(header_line):
+			if fasta_dir is not None:
+				content += fasta
+				new_accounted_for.append(record.id)
+			fasta_result[header_line] = sequence
+
+	if len(fasta_result)==0:
+		return fasta_result
+
+	# Write the string in a file
+	if fasta_dir is not None:
+		# write fasta
+		filename = 'unaligned_complete_'
+		if accounted_for is None:
+			filename += 'all_'
+		else:
+			filename += 'new_'
+		filename += file_id
+		fasta_dir.mkdir(exist_ok=True)
+		f = open(fasta_dir / filename, 'w')
+		f.write(content)
+		f.close()
+
+		# update meta information
+		info_dict = {'last_id': file_id,
+					 'aligned_ids': new_accounted_for
+					}
+		with open(fasta_dir / 'alignment_information.txt', 'w') as file:
+			file.write(json.dumps(info_dict))
+
+	return fasta_result
+
+
+
+
+
 def records_to_fasta(records, fasta_dir=None, filename='records.txt', header_filter=None, max_used=None):
 	"""
 	DESCRIPTION:
@@ -57,6 +131,8 @@ def records_to_fasta(records, fasta_dir=None, filename='records.txt', header_fil
 	:param filename: [string] name of the file in which the sequences are stores.
 	:return: Generates the file with the records.
 	"""
+
+	return write_new_records_to_fasta(records=records, file_id=filename, fasta_dir=fasta_dir, accounted_for=None, header_filter=header_filter, max_used=max_used)
 	# Check we have records or not
 	if records is None:
 		return None
@@ -83,6 +159,51 @@ def records_to_fasta(records, fasta_dir=None, filename='records.txt', header_fil
 	return fasta_result
 
 
+
+
+
+def update_alignment():
+	print('retrieving records')
+	result = ncbi.get_all_covid_nucleotide_seqs(cache_dir=config.CACHE_DIR)
+	records = result.get('seqrecords')
+	print('number of records retrieved: ' + str(len(records)))
+	timestamp = datetime.fromtimestamp(int(result['request_timestamp'])).strftime("%Y%m%d%H%M%S")
+	old_timestamp, accounted_for_genomes = get_fasta_info(config.FASTA_DIR)
+	if old_timestamp is None or accounted_for_genomes is None:
+		print('we haven\'t made any previous alignments')
+		# we haven't made any previous alignments
+		result = write_new_records_to_fasta(records, timestamp, fasta_dir=config.FASTA_DIR, accounted_for=accounted_for_genomes, 
+											header_filter=filter_complete_genome, max_used=None)
+		print('numbers of records used: ' + str(len(result)))
+		# align the genomes using mafft
+		print('aligning with mafft')
+		if os.name == 'posix':
+			mafft_route = '/usr/bin/mafft'
+			if True or not os.path.exists(config.FASTA_DIR / destname):
+				print('Alignment not found in fasta folder')
+				print('Starting alignment')
+				mafft(origname='unaligned_complete_all_' + timestamp, destname='aligned_complete_' + timestamp, route=mafft_route)
+				print('Alignment finished')
+			else:
+				print('Alignment found in fasta folder')
+		else:
+			pass
+
+
+	else:
+		print('we have made previous alignments and can thus add our new sequences to that alignment')
+		# we have made previous alignments and can thus add our new sequences to that alignment
+		result = write_new_records_to_fasta(records, timestamp, fasta_dir=config.FASTA_DIR, accounted_for=accounted_for_genomes, 
+											header_filter=filter_complete_genome, max_used=None)
+		print('numbers of records used: ' + str(len(result)))
+		if (len(result) != 0):
+			# new sequences have been retrieved that need to be aligned
+			print('Adding new sequences to alignment ' + old_timestamp)
+			mafft_add(aligned_file='aligned_complete_' + old_timestamp, unaligned_file='unaligned_complete_new_' + timestamp, output_file='aligned_complete_' + timestamp)
+		else:
+			print('No new sequences to add: No changes made')
+
+
 def main():
 	"""
 	DESCRIPTION:
@@ -90,41 +211,13 @@ def main():
 	:return: None.
 	"""
 	# retrieve records from database or cache
-	print('retrieving records')
-	result = ncbi.get_all_covid_nucleotide_seqs(cache_dir=config.CACHE_DIR)
-	records = result.get('seqrecords')
-	
-	print('number of records retrieved: ' + str(len(records)))
 
-	# write the records to a file in the fasta format
-	print('writing as fasta')
-	max_used=400
-	origname = 'complete_genomeDNA'
-	destname = 'complete_gene_align'
-	if max_used is not None:
-		origname += str(max_used)
-		destname += str(max_used)
-
-	result = records_to_fasta(records, config.FASTA_DIR, origname, filter_complete_genome, max_used=max_used)
-	print('numbers of records used: ' + str(len(result)))
-
-	# align the genomes using mafft
-	print('aligning with mafft')
-	if os.name == 'posix':
-		mafft_route = '/usr/bin/mafft'
-		if not os.path.exists(config.FASTA_DIR / destname):
-			print('Alignment not found in fasta folder')
-			print('Starting alignment')
-			mafft(origname=origname, destname=destname, route=mafft_route)
-			print('Alignment finished')
-		else:
-			print('Alignment found in fasta folder')
-	else:
-		pass
+	update_alignment()
+	recent_timestamp, accounted_for = get_fasta_info(config.FASTA_DIR)
 
 	# iqtree visualizing tree	
 	print('Select the best alignments')
-	origname = destname[:]
+	origname = 'aligned_complete_' + recent_timestamp
 	destname = 'selection.txt'
 	n_genomes = 100
 	if not os.path.exists(config.TREE_DIR / destname.split('.')[0] / destname):
@@ -140,7 +233,10 @@ def main():
 		print('Tree found in tree folder')
 	print('Generating tree visualization')
 	tree_route = config.TREE_DIR / destname.split('.')[0]
-	ete.tree_viewer(tree_route)
+	print(destname)
+	print(destname.split('.')[0])
+	print(tree_route)
+	#ete.tree_viewer(tree_route)
 
 
 if __name__ == '__main__':

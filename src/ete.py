@@ -9,7 +9,9 @@ def newick_extractor(fileroute):
 
 def tree_viewer(treefolder):
     filename = os.path.basename(os.path.normpath(treefolder)) + '.txt.treefile'
+    print(filename)
     treeroute = treefolder / filename
+    print(treeroute)
     file = open(treeroute, 'r')
     tree = file.read()
     file.close()

@@ -16,10 +16,10 @@ def _get_raw_sequence(uid, cache_dir=None, format='gb'):
 		shelve_path = cache_dir / config.RAW_SEQUENCE_SHELVE_FNAME
 		shelved_raw_seqs = shelve.open(str(shelve_path))
 		if uid in shelved_raw_seqs:
-			print('uid: ' + str(uid) + ' already in cache')
+			# print('uid: ' + str(uid) + ' already in cache')
 			return shelved_raw_seqs[uid]
 
-	print('uid: ' + str(uid) + ' not in cache, proceding to download')
+	#print('uid: ' + str(uid) + ' not in cache, proceding to download')
 	nucl_download_url = ENTREZ_NUCL_DOWNLOAD_URL.format(uids=','.join([uid]), format=format)
 
 	response = requests.get(nucl_download_url)
@@ -61,11 +61,10 @@ def get_all_covid_nucleotide_seqs(cache_dir=None):
 	seq_records = []
 	for uid in uids:
 		raw_seq = _get_raw_sequence(uid, cache_dir=cache_dir, format='gb')
-		print('retrieving record ' + str(len(seq_records)+1) + '/' + str(n_seqs_found))
+		#print('retrieving record ' + str(len(seq_records)+1) + '/' + str(n_seqs_found))
 		fhand = io.StringIO(raw_seq)
 		record = list(SeqIO.parse(fhand, 'gb'))[0]
-		seq_records.append(
-			record)  # used to be .append(seq_records) resulting in the list containing itself an exponetial number of times...
+		seq_records.append(record)  # used to be .append(seq_records) resulting in the list containing itself an exponetial number of times...
 
 	search_result = {'request_timestamp': time.time(),
 					 'seqrecords': seq_records
