@@ -3,6 +3,7 @@ import os
 import json
 import ncbi, config, iqtree, ete
 from datetime import datetime
+from pathlib import Path
 from Bio.Align.Applications import MafftCommandline
 
 
@@ -220,11 +221,13 @@ def main():
 	origname = 'aligned_complete_' + recent_timestamp
 	destname = 'selection.txt'
 	n_genomes = 100
-	if not os.path.exists(config.TREE_DIR / destname.split('.')[0] / destname):
+
+	if not Path.exists(config.TREE_DIR / destname.split('.')[0] / destname):
 		print('Creating selection file')
-		iqtree.align_selector(origname, destname, n_genomes)
+	iqtree.align_selector(origname, destname, n_genomes)
 	print('Looking for tree inference')
-	if len(os.listdir(config.TREE_DIR / destname.split('.')[0])) < 2:
+	folder = Path(config.TREE_DIR / destname.split('.')[0])
+	if len([x for x in folder.iterdir()]) < 2:
 		print('Tree not found in tree folder')
 		print('Starting tree inference')
 		iqtree.tree_creator(destname)
@@ -233,10 +236,7 @@ def main():
 		print('Tree found in tree folder')
 	print('Generating tree visualization')
 	tree_route = config.TREE_DIR / destname.split('.')[0]
-	print(destname)
-	print(destname.split('.')[0])
-	print(tree_route)
-	#ete.tree_viewer(tree_route)
+	ete.tree_viewer(tree_route)
 
 
 if __name__ == '__main__':
