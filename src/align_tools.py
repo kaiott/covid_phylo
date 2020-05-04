@@ -29,36 +29,11 @@ class SequenceAligner:
         if already_aligned_sequence_ids is None:
             already_aligned_sequence_ids = []
         self.filters = []
-        self.selection_specifier = tag
+        self.tag = tag
         self.file_id = file_id
         self.unfiltered_records = records
         self.already_aligned_file_id = already_aligned_file_id
         self.already_aligned_sequence_ids = already_aligned_sequence_ids
-
-    def add_filter(self, description_filter):
-        """
-        DESCRIPTION:
-        Adds a filter to filters
-        :param description_filter: [function] filter that will be added
-        """
-        self.filters.append(description_filter)
-
-    @staticmethod
-    def get_actual(selection_specifier):
-        """
-        DESCRIPTION:
-        Loads information of a previous alignment of this selection
-        :param selection_specifier: [string] name of the alignment to check
-        :return: [string, list] id of the last alignment done with this tag
-        and list of id's of sequences already aligned by that
-        """
-        try:
-            filename = SequenceAligner.information_pattern.format(selection_specifier=selection_specifier)
-            with open(SequenceAligner.used_dir / filename, 'r') as file:
-                json_info = json.load(file)
-                return json_info['last_id'], json_info['aligned_ids']
-        except FileNotFoundError:
-            return None, []
 
     @staticmethod
     def from_tag(tag, data):
@@ -77,12 +52,20 @@ class SequenceAligner:
             print(
                 f'Found previous alignment of {tag} with id {already_aligned_file_id} and {len(already_aligned_sequence_ids)} aligned sequences')
 
-        timestamp = datetime.fromtimestamp(int(data.get('request_timestamp')).strftime("%Y%m%d%H%M%S")
+        timestamp = datetime.fromtimestamp(int(data.get('request_timestamp'))).strftime("%Y%m%d%H%M%S")
         records = data.get('seqrecords')
         return SequenceAligner(tag, timestamp, records=records, already_aligned_file_id=already_aligned_file_id,
                                already_aligned_sequence_ids=already_aligned_sequence_ids)
 
-    def make_alignment(self):
+    def add_filter(self, description_filter):
+        """
+        DESCRIPTION:
+        Adds a filter to filters
+        :param description_filter: [function] filter that will be added
+        """
+        self.filters.append(description_filter)
+
+    def make_alignment(self, make_copy=False):
         """
         DESCRIPTION:
         Aligns unaligned sequences and writes them to a file. Updates the information file
@@ -102,53 +85,71 @@ class SequenceAligner:
             print('adding to previous alignment')
             self._align_from_existing()
 
+        if make_copy:
+            self._copy_aligned_file_unstamped()
+
         # at this point assume alignment done successfully
         # update meta information
         sequence_ids_written += self.already_aligned_sequence_ids
         info_dict = {'last_id': self.file_id,
                      'aligned_ids': sequence_ids_written
                      }
-        info_filename = SequenceAligner.information_pattern.format(selection_specifier=self.selection_specifier)
+        info_filename = SequenceAligner.information_pattern.format(tag=self.tag)
         with open(SequenceAligner.used_dir / info_filename, 'w') as file:
             file.write(json.dumps(info_dict))
 
-    def _align_from_scratch(self):
-        """
-        DESCRIPTION:
-        Aligns unaligned sequences in case there was no previous alignment and
-        writes the alignment to a file
-        """
-        origname = SequenceAligner.used_dir / SequenceAligner.unaligned_pattern.format(
-            selection_specifier=self.selection_specifier, file_id=self.file_id)
-        destname = SequenceAligner.used_dir / SequenceAligner.aligned_pattern.format(
-            selection_specifier=self.selection_specifier, file_id=self.file_id)
-        # Execute mafft
-        print('Executing sequences alignment...')
-        mafft_cline = MafftCommandline(SequenceAligner.mafft_dir, input=origname)
-        stdout, stderr = mafft_cline()
-        print('Alignment completed')
-        # Write result into file
-        file = open(destname, 'w')
-        file.write(stdout)
-        file.close()
-        print('Alignment saved')
+    def _copy_aligned_file_unstamped(self):
+        in_filename = SequenceAligner.used_dir / self.get_aligned_filename()
+        out_filename = SequenceAligner.used_dir / f'{self.tag}_aligned'
+        with open(in_filename, 'r') as in_file, open(out_filename, 'w') as out_file:
+            content = in_file.read()
+            out_file.write(content)
 
-    def _align_from_existing(self):
+    def get_aligned_filename(self):
         """
         DESCRIPTION:
-        Add unaligned sequences to an existing alignment and writes the alignment
-        to a file
+        Returns the name of the file with the aligned sequences
+        :return: [string] the name of the output file
         """
-        unaligned_file = SequenceAligner.used_dir / SequenceAligner.unaligned_pattern.format(
-            selection_specifier=self.selection_specifier, file_id=self.file_id)
-        aligned_file = SequenceAligner.used_dir / SequenceAligner.aligned_pattern.format(
-            selection_specifier=self.selection_specifier, file_id=self.already_aligned_file_id)
-        output_file = SequenceAligner.used_dir / SequenceAligner.aligned_pattern.format(
-            selection_specifier=self.selection_specifier, file_id=self.file_id)
-        print('Executing sequences alignment...')
-        command = f'mafft --add {unaligned_file} --reorder {aligned_file} > {output_file}'
-        os.system(command)
-        print('Alignment completed')
+        return SequenceAligner.aligned_pattern.format(tag=self.tag,
+                                                      file_id=self.already_aligned_file_id)
+
+    @staticmethod
+    def get_actual(tag):
+        """
+        DESCRIPTION:
+        Loads information of a previous alignment of this selection
+        :param tag: [string] name of the alignment to check
+        :return: [string, list] id of the last alignment done with this tag
+        and list of id's of sequences already aligned by that
+        """
+        try:
+            filename = SequenceAligner.information_pattern.format(tag=tag)
+            with open(SequenceAligner.used_dir / filename, 'r') as file:
+                json_info = json.load(file)
+                return json_info['last_id'], json_info['aligned_ids']
+        except FileNotFoundError:
+            return None, []
+
+    def get_filtered_records(self):
+        """
+        DESCRIPTION:
+        Filters this object's records according to whether these records fulfill the
+        self.filters criteria and whether they have already been aligned
+        :return: [list] list of records that pass the filters
+        """
+        if self.unfiltered_records is None:
+            return None
+
+        result_records = []
+        for record in self.unfiltered_records:
+            if record.id in self.already_aligned_sequence_ids:
+                continue
+
+            if all([description_filter(record.description) for description_filter in self.filters]):
+                result_records.append(record)
+
+        return result_records
 
     def set_records(self, records):
         """
@@ -171,7 +172,7 @@ class SequenceAligner:
 
         sequence_ids_written = []
         output_file = SequenceAligner.used_dir / SequenceAligner.unaligned_pattern.format(
-            selection_specifier=self.selection_specifier, file_id=self.file_id)
+            tag=self.tag, file_id=self.file_id)
         with open(output_file, 'w') as file:
             for record in records:
                 file.write(record.format('fasta'))
@@ -179,35 +180,42 @@ class SequenceAligner:
 
         return sequence_ids_written
 
-    def get_filtered_records(self):
+    def _align_from_scratch(self):
         """
         DESCRIPTION:
-        Filters this object's records according to whether these records fulfill the
-        self.filters criteria and whether they have already been aligned
-        :return: [list] list of records that pass the filters
+        Aligns unaligned sequences in case there was no previous alignment and
+        writes the alignment to a file
         """
-        if self.unfiltered_records is None:
-            return None
+        origname = SequenceAligner.used_dir / SequenceAligner.unaligned_pattern.format(
+            tag=self.tag, file_id=self.file_id)
+        destname = SequenceAligner.used_dir / SequenceAligner.aligned_pattern.format(
+            tag=self.tag, file_id=self.file_id)
+        print('Executing sequences alignment...')
+        mafft_cline = MafftCommandline(SequenceAligner.mafft_dir, input=origname)
+        stdout, stderr = mafft_cline()
+        print('Alignment completed')
+        # Write result into file
+        file = open(destname, 'w')
+        file.write(stdout)
+        file.close()
+        print('Alignment saved')
 
-        result_records = []
-        for record in self.unfiltered_records:
-            if record.id in self.already_aligned_sequence_ids:
-                # omitting this record, cause already accounted for
-                continue
-
-            if all([filt(record.description) for filt in self.filters]):
-                result_records.append(record)
-
-        return result_records
-
-    def get_aligned_filename(self):
+    def _align_from_existing(self):
         """
         DESCRIPTION:
-        Returns the name of the file with the aligned sequences
-        :return: [string] the name of the output file
+        Add unaligned sequences to an existing alignment and writes the alignment
+        to a file
         """
-        return SequenceAligner.aligned_pattern.format(selection_specifier=self.selection_specifier,
-                                                      file_id=self.already_aligned_file_id)
+        unaligned_file = SequenceAligner.used_dir / SequenceAligner.unaligned_pattern.format(
+            tag=self.tag, file_id=self.file_id)
+        aligned_file = SequenceAligner.used_dir / SequenceAligner.aligned_pattern.format(
+            tag=self.tag, file_id=self.already_aligned_file_id)
+        output_file = SequenceAligner.used_dir / SequenceAligner.aligned_pattern.format(
+            tag=self.tag, file_id=self.file_id)
+        print('Executing sequences alignment...')
+        command = f'mafft --add {unaligned_file} --reorder {aligned_file} > {output_file}'
+        os.system(command)
+        print('Alignment completed')
 
 
 class Filter:
