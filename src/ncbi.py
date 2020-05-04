@@ -2,13 +2,38 @@ import config
 from pprint import pprint
 import time
 import shelve
-import io
+import io, sys
 import requests
 from Bio import SeqIO
 
 ENTREZ_COVID_SEARCH_URL = 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=nucleotide&term=txid2697049[Organism:noexp]&retmode=json&retmax=10000'
 
 ENTREZ_NUCL_DOWNLOAD_URL = 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=nucleotide&id={uids}&retmode=text&rettype={format}'
+
+
+
+# update_progress() : Displays or updates a console progress bar
+## Accepts a float between 0 and 1. Any int will be converted to a float.
+## A value under 0 represents a 'halt'.
+## A value at 1 or bigger represents 100%
+def update_progress(progress):
+    barLength = 30 # Modify this to change the length of the progress bar
+    status = ""
+    if isinstance(progress, int):
+        progress = float(progress)
+    if not isinstance(progress, float):
+        progress = 0
+        status = "error: progress var must be float\n"
+    if progress < 0:
+        progress = 0
+        status = "Halt...\n"
+    if progress >= 1:
+        progress = 1
+        status = "Done\n"
+    block = int(round(barLength*progress))
+    text = f'\r\rRetrieving records: [{ "#"*block }{ "-"*(barLength-block) }] {(progress*100):.1f}% {status}'
+    sys.stdout.write(text)
+    sys.stdout.flush()
 
 
 def _get_raw_sequence(uid, cache_dir=None, format='gb'):
@@ -62,6 +87,7 @@ def get_all_covid_nucleotide_seqs(cache_dir=None):
 	for uid in uids:
 		raw_seq = _get_raw_sequence(uid, cache_dir=cache_dir, format='gb')
 		#print('retrieving record ' + str(len(seq_records)+1) + '/' + str(n_seqs_found))
+		update_progress((len(seq_records)+1)/n_seqs_found)
 		fhand = io.StringIO(raw_seq)
 		record = list(SeqIO.parse(fhand, 'gb'))[0]
 		seq_records.append(record)  # used to be .append(seq_records) resulting in the list containing itself an exponetial number of times...
