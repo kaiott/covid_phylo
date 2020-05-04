@@ -20,14 +20,14 @@ def main():
 	timestamp = datetime.fromtimestamp(int(result['request_timestamp'])).strftime("%Y%m%d%H%M%S")
 
 	# all from China that are of the complete genome
-	china_aligner = SequenceAligner.from_most_recent_existing_alignment('china', timestamp)
+	china_aligner = SequenceAligner.from_tag('china', timestamp)
 	china_filter = Filter(['CHN', 'complete genome']).all_filter
 	china_aligner.set_records(records)
 	china_aligner.add_filter(china_filter)
 	china_aligner.make_alignment()
 
 	# complete genomes either from Spain or England that have Covid-19-2 in their description
-	second_aligner = SequenceAligner.from_most_recent_existing_alignment('test2', timestamp)
+	second_aligner = SequenceAligner.from_tag('test2', timestamp)
 	type_filter = Filter(['complete genome', 'Covid-19-2']).all_filter
 	country_filter = Filter(['ESP', 'USA']).any_filter
 	second_aligner.set_records(records)
@@ -36,7 +36,7 @@ def main():
 	second_aligner.make_alignment()
 
 	# all genomes of protein 'N' neither from US nor China
-	third_aligner = SequenceAligner.from_most_recent_existing_alignment('test3', timestamp)
+	third_aligner = SequenceAligner.from_tag('test3', timestamp)
 	type_filter = Filter(['N protein or whatever the name was']).all_filter
 	country_filter = Filter(['CHN', 'USA']).none_filter
 	third_aligner.set_records(records)
