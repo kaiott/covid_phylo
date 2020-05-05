@@ -8,6 +8,10 @@ from Bio.Align.Applications import MafftCommandline
 from align_tools import SequenceAligner, Filter
 
 
+
+def align_complete(data):
+
+
 def main():
     """
     DESCRIPTION:
@@ -26,6 +30,13 @@ def main():
     my_aligner.set_records(records)
     my_aligner.add_filter(complete_filter)
     my_aligner.make_alignment()
+
+    # all from China that are of the complete genome
+    china_aligner = SequenceAligner.from_tag('china', timestamp)
+    china_filter = Filter(['CHN', 'complete genome']).all_filter
+    china_aligner.set_records(records)
+    china_aligner.add_filter(china_filter)
+    china_aligner.make_alignment()
 
     # iqtree visualizing tree
     print('Select the best alignments')

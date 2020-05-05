@@ -23,7 +23,7 @@ def get_counter(arr, lower_sat=None, upper_sat=None):
 
 
 def analyse_gaps(num_gaps, collaps_factor=1):
-    print(get_counter(num_gaps, 1))
+    print(get_counter(num_gaps, upper_sat=1))
     has_gaps = [h(num_gap) for num_gap in num_gaps]
     num_gaps_collaps = [sum(has_gaps[max([collaps_factor*i, 0]):min([collaps_factor*(i+1), len(has_gaps)])]) for i in range(int(len(has_gaps)/collaps_factor)+1)]
 
@@ -59,11 +59,15 @@ def analyse_changes(num_vars_det, num_vars_all):
     plt.show()
 
 
+def main():
+    records = at.aligned_records_by_tag("complete")
+    num_gaps, num_vars_det, num_vars_all = at.analyse_alignment(records)
+    print("done anaylsis")
 
-records = at.aligned_records_by_tag("complete")
-num_gaps, num_vars_det, num_vars_all = at.analyse_alignment(records)
-print("done anaylsis")
+    analyse_gaps(num_gaps, collaps_factor=300)
 
-analyse_gaps(num_gaps, collaps_factor=300)
+    analyse_changes(num_vars_det, num_vars_all)
 
-analyse_changes(num_vars_det, num_vars_all)
+
+if __name__ == '__main__':
+    main()

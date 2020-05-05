@@ -298,12 +298,11 @@ def analyse_alignment(aligned_records):
             c = seq[site]
             if c == '-':
                 num_gaps[site] += 1
-            elif c == 'a' or c == 't' or c == 'g' or c == 'c': # also counting N or X as but not gaps as variation
+            elif c == 'a' or c == 't' or c == 'g' or c == 'c':
                 num_nucleotides_det[c] = True
             else:
                 num_nucleotides_undet[c] = True
 
-        #print(num_nucleotides)
         num_variation_det[site] = len(num_nucleotides_det)
         num_variation_all[site] = num_variation_det[site] + len(num_nucleotides_undet)
 
