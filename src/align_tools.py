@@ -1,5 +1,6 @@
 import config
 import json
+import numpy as np
 import os
 from datetime import datetime
 from Bio.Align.Applications import MafftCommandline
@@ -254,3 +255,53 @@ class Filter:
         :return: [boolean] true iff the string to check contains none of the keywords
         """
         return not any([key_word in string_to_check for key_word in self.key_words])
+
+
+def _get_aligned_content_by_tag(tag):
+    file = config.FASTA_DIR / f'{tag}_aligned'
+    try:
+        with open(file, 'r') as f:
+            return f.read()
+
+    except FileNotFoundError:
+        print(f'no alignment with tag {tag}')
+        return None
+
+
+def aligned_records_by_tag(tag):
+    content = _get_aligned_content_by_tag(tag)
+    if content is None:
+        return None
+
+    raw_records = content.split('>')[1:]
+    records = []
+    for raw_record in raw_records:
+        header, sequence = raw_record.split('\n', 1)
+        records.append({'header': header, 'sequence': sequence.replace('\n', '')})
+
+    return records
+
+
+def analyse_alignment(aligned_records):
+    sequences = [record['sequence'] for record in aligned_records]
+    lengths = [len(seq) for seq in sequences]
+    if max(lengths) != min(lengths):
+        print('sequences don\'t have same length')
+        return
+
+    num_gaps = np.zeros(lengths[0], dtype=int)
+    num_variation = np.zeros(lengths[0], dtype=int)
+    for site in range(lengths[0]):
+        num_nucleotides = {}
+        for seq in sequences:
+            c = seq[site]
+            if c == '-':
+                num_gaps[site] += 1
+            else: # also counting N or X as but not gaps as variation
+                num_nucleotides[c] = True
+
+        print(num_nucleotides)
+        num_variation[site] = len(num_nucleotides)
+
+    return num_gaps, num_variation
+
