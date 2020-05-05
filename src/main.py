@@ -1,16 +1,36 @@
-import re
-import os
-import json
 import ncbi, config, iqtree, ete
-from datetime import datetime
-from pathlib import Path
-from Bio.Align.Applications import MafftCommandline
 from align_tools import SequenceAligner, Filter
 
+def get_sequences():
+    return ncbi.get_all_covid_nucleotide_seqs(cache_dir=config.CACHE_DIR)
 
 
 def align_complete(data):
+    my_aligner = SequenceAligner.from_tag(tag='complete', data=data)
+    complete_filter = Filter(['complete genome']).all_filter
+    my_aligner.add_filter(complete_filter)
+    my_aligner.make_alignment()
 
+    # for a copy without timestamp
+    my_aligner.copy_aligned_file_unstamped()
+
+def align_china(data):
+    china_aligner = SequenceAligner.from_tag(tag='china', data=data)
+    china_filter = Filter(['CHN', 'complete genome']).all_filter
+    china_aligner.add_filter(china_filter)
+    china_aligner.make_alignment()
+
+    # for a copy without timestamp
+    my_aligner.copy_aligned_file_unstamped()
+
+def align_spain(data):
+    aligner = SequenceAligner.from_tag(tag='spain', data=data)
+    filt = Filter(['ESP', 'complete genome']).all_filter
+    aligner.add_filter(filt)
+    aligner.make_alignment()
+
+    # for a copy without timestamp
+    aligner.copy_aligned_file_unstamped()
 
 def main():
     """
@@ -19,46 +39,11 @@ def main():
     :return: None.
     """
     print('retrieving records')
-    result = ncbi.get_all_covid_nucleotide_seqs(cache_dir=config.CACHE_DIR)
-    records = result.get('seqrecords')
-    print('number of records retrieved: ' + str(len(records)))
-    timestamp = datetime.fromtimestamp(int(result['request_timestamp'])).strftime("%Y%m%d%H%M%S")
-
-    # update the complete alignment
-    my_aligner = SequenceAligner.from_tag('complete', timestamp)
-    complete_filter = Filter(['complete genome']).all_filter
-    my_aligner.set_records(records)
-    my_aligner.add_filter(complete_filter)
-    my_aligner.make_alignment()
-
-    # all from China that are of the complete genome
-    china_aligner = SequenceAligner.from_tag('china', timestamp)
-    china_filter = Filter(['CHN', 'complete genome']).all_filter
-    china_aligner.set_records(records)
-    china_aligner.add_filter(china_filter)
-    china_aligner.make_alignment()
-
-    # iqtree visualizing tree
-    print('Select the best alignments')
-    origname = my_aligner.get_aligned_filename()
-    destname = 'selection.txt'
-    n_genomes = 100
-
-    if not Path.exists(config.TREE_DIR / destname.split('.')[0] / destname):
-        print('Creating selection file')
-    iqtree.align_selector(origname, destname, n_genomes)
-    print('Looking for tree inference')
-    folder = Path(config.TREE_DIR / destname.split('.')[0])
-    if len([x for x in folder.iterdir()]) < 2:
-        print('Tree not found in tree folder')
-        print('Starting tree inference')
-        iqtree.tree_creator(destname)
-        print('Inference finished')
-    else:
-        print('Tree found in tree folder')
-    print('Generating tree visualization')
-    tree_route = config.TREE_DIR / destname.split('.')[0]
-    ete.tree_viewer(tree_route)
+    result = get_sequences()
+    
+    align_complete(data=result)
+    align_china(data=result)
+    align_spain(data=result)
 
 
 if __name__ == '__main__':
