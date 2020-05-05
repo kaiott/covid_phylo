@@ -19,3 +19,5 @@ TREE_DIR = BASE_DIR / 'tree'
 TREE_DIR.mkdir(exist_ok=True)
 
 RAW_SEQUENCE_SHELVE_FNAME = 'raw_seqs.shelve'
+
+MAFFT_DIR = '/usr/bin/mafft'
