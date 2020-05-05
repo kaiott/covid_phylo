@@ -289,18 +289,23 @@ def analyse_alignment(aligned_records):
         return
 
     num_gaps = np.zeros(lengths[0], dtype=int)
-    num_variation = np.zeros(lengths[0], dtype=int)
+    num_variation_det = np.zeros(lengths[0], dtype=int)
+    num_variation_all = np.zeros(lengths[0], dtype=int)
     for site in range(lengths[0]):
-        num_nucleotides = {}
+        num_nucleotides_det = {}
+        num_nucleotides_undet = {}
         for seq in sequences:
             c = seq[site]
             if c == '-':
                 num_gaps[site] += 1
-            else: # also counting N or X as but not gaps as variation
-                num_nucleotides[c] = True
+            elif c == 'a' or c == 't' or c == 'g' or c == 'c': # also counting N or X as but not gaps as variation
+                num_nucleotides_det[c] = True
+            else:
+                num_nucleotides_undet[c] = True
 
-        print(num_nucleotides)
-        num_variation[site] = len(num_nucleotides)
+        #print(num_nucleotides)
+        num_variation_det[site] = len(num_nucleotides_det)
+        num_variation_all[site] = num_variation_det[site] + len(num_nucleotides_undet)
 
-    return num_gaps, num_variation
+    return num_gaps, num_variation_det, num_variation_all
 
