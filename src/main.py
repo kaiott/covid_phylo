@@ -7,6 +7,8 @@ from pathlib import Path
 from Bio.Align.Applications import MafftCommandline
 from align_tools import SequenceAligner, Filter
 
+def get_sequences():
+    return ncbi.get_all_covid_nucleotide_seqs(cache_dir=config.CACHE_DIR)
 
 def main():
     """
@@ -15,11 +17,11 @@ def main():
     :return: None.
     """
     print('retrieving records')
-    result = ncbi.get_all_covid_nucleotide_seqs(cache_dir=config.CACHE_DIR)
+    result = get_sequences()
     records = result.get('seqrecords')
     print('number of records retrieved: ' + str(len(records)))
     timestamp = datetime.fromtimestamp(int(result['request_timestamp'])).strftime("%Y%m%d%H%M%S")
-
+    '''
     # update the alignment of the N genome
     n_aligner = SequenceAligner.from_tag(tag='gene_N', data=result)
     filter1 = Filter(['nucleocapsid phosphoprotein', 'complete cds']).all_filter
@@ -48,7 +50,7 @@ def main():
     s_aligner.add_filter(filter2)
     print(len(s_aligner.get_filtered_records()))
     s_aligner.make_alignment()
-    s_aligner.copy_aligned_file_unstamped()
+    s_aligner.copy_aligned_file_unstamped()'''
 
     # update the alignment of the complete genome
     my_aligner = SequenceAligner.from_tag(tag='complete', data=result)
@@ -59,7 +61,7 @@ def main():
 
 
 
-'''
+    '''
     # iqtree visualizing tree
     print('Select the best alignments')
     origname = my_aligner.get_aligned_filename()

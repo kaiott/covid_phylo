@@ -4,6 +4,7 @@ import numpy as np
 import os
 from datetime import datetime
 from Bio.Align.Applications import MafftCommandline
+import matplotlib.pyplot as plt
 
 
 class SequenceAligner:
@@ -314,11 +315,12 @@ def analyse_alignment(aligned_records):
             c = seq[site]
             if c == '-':
                 num_gaps[site] += 1
-            else: # also counting N or X as but not gaps as variation
+            else: # also counting n, v,d,h,w,r,y as but not gaps as variation
                 num_nucleotides[c] = True
 
-        print(num_nucleotides)
-        num_variation[site] = len(num_nucleotides)
+        num_variation[site] = len(num_nucleotides)   
+        if len(num_nucleotides) > 5:
+            print(num_nucleotides) 
 
     return num_gaps, num_variation
 
