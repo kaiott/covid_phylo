@@ -102,24 +102,15 @@ class SequenceAligner:
         with open(config.FASTA_DIR / info_filename, 'w') as file:
             file.write(json.dumps(info_dict))
 
-<<<<<<< HEAD
     def copy_aligned_file_unstamped(self):
         try:
-            in_filename = SequenceAligner.used_dir / self.get_aligned_filename()
-            out_filename = SequenceAligner.used_dir / f'{self.tag}_aligned'
+            in_filename = config.FASTA_DIR / self.get_aligned_filename()
+            out_filename = config.FASTA_DIR / f'{self.tag}_aligned'
             with open(in_filename, 'r') as in_file, open(out_filename, 'w') as out_file:
                 content = in_file.read()
                 out_file.write(content)
         except FileNotFoundError:
             print('warning file not found, nothing copied')
-=======
-    def _copy_aligned_file_unstamped(self):
-        in_filename = config.FASTA_DIR / self.get_aligned_filename()
-        out_filename = config.FASTA_DIR / f'{self.tag}_aligned'
-        with open(in_filename, 'r') as in_file, open(out_filename, 'w') as out_file:
-            content = in_file.read()
-            out_file.write(content)
->>>>>>> 94444da2e353d157575957a42906e1aaf20ce6ef
 
     def get_aligned_filename(self):
         """
