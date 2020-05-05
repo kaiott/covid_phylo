@@ -1,5 +1,6 @@
 import config
 import json
+import numpy as np
 import os
 from datetime import datetime
 from Bio.Align.Applications import MafftCommandline
@@ -8,8 +9,7 @@ from Bio.Align.Applications import MafftCommandline
 class SequenceAligner:
     # configuration of the SequenceAligner class, can
     # be changed if needed
-    used_dir = config.FASTA_DIR
-    mafft_dir = '/usr/bin/mafft'
+
     unaligned_pattern = '{tag}_{file_id}_unaligned'
     aligned_pattern = '{tag}_{file_id}_aligned'
     information_pattern = '{tag}_information.txt'
@@ -99,9 +99,10 @@ class SequenceAligner:
                      'aligned_ids': sequence_ids_written
                      }
         info_filename = SequenceAligner.information_pattern.format(tag=self.tag)
-        with open(SequenceAligner.used_dir / info_filename, 'w') as file:
+        with open(config.FASTA_DIR / info_filename, 'w') as file:
             file.write(json.dumps(info_dict))
 
+<<<<<<< HEAD
     def copy_aligned_file_unstamped(self):
         try:
             in_filename = SequenceAligner.used_dir / self.get_aligned_filename()
@@ -111,6 +112,14 @@ class SequenceAligner:
                 out_file.write(content)
         except FileNotFoundError:
             print('warning file not found, nothing copied')
+=======
+    def _copy_aligned_file_unstamped(self):
+        in_filename = config.FASTA_DIR / self.get_aligned_filename()
+        out_filename = config.FASTA_DIR / f'{self.tag}_aligned'
+        with open(in_filename, 'r') as in_file, open(out_filename, 'w') as out_file:
+            content = in_file.read()
+            out_file.write(content)
+>>>>>>> 94444da2e353d157575957a42906e1aaf20ce6ef
 
     def get_aligned_filename(self):
         """
@@ -144,7 +153,7 @@ class SequenceAligner:
         """
         try:
             filename = SequenceAligner.information_pattern.format(tag=tag)
-            with open(SequenceAligner.used_dir / filename, 'r') as file:
+            with open(config.FASTA_DIR / filename, 'r') as file:
                 json_info = json.load(file)
                 return json_info['last_id'], json_info['aligned_ids']
         except FileNotFoundError:
@@ -190,7 +199,7 @@ class SequenceAligner:
             return []
 
         sequence_ids_written = []
-        output_file = SequenceAligner.used_dir / SequenceAligner.unaligned_pattern.format(
+        output_file = config.FASTA_DIR / SequenceAligner.unaligned_pattern.format(
             tag=self.tag, file_id=self.file_id)
         with open(output_file, 'w') as file:
             for record in records:
@@ -205,12 +214,12 @@ class SequenceAligner:
         Aligns unaligned sequences in case there was no previous alignment and
         writes the alignment to a file
         """
-        origname = SequenceAligner.used_dir / SequenceAligner.unaligned_pattern.format(
+        origname = config.FASTA_DIR / SequenceAligner.unaligned_pattern.format(
             tag=self.tag, file_id=self.file_id)
-        destname = SequenceAligner.used_dir / SequenceAligner.aligned_pattern.format(
+        destname = config.FASTA_DIR / SequenceAligner.aligned_pattern.format(
             tag=self.tag, file_id=self.file_id)
         print('Executing sequences alignment...')
-        mafft_cline = MafftCommandline(SequenceAligner.mafft_dir, input=origname)
+        mafft_cline = MafftCommandline(config.MAFFT_DIR, input=origname)
         stdout, stderr = mafft_cline()
         print('Alignment completed')
         # Write result into file
@@ -224,11 +233,11 @@ class SequenceAligner:
         Add unaligned sequences to an existing alignment and writes the alignment
         to a file
         """
-        unaligned_file = SequenceAligner.used_dir / SequenceAligner.unaligned_pattern.format(
+        unaligned_file = config.FASTA_DIR / SequenceAligner.unaligned_pattern.format(
             tag=self.tag, file_id=self.file_id)
-        aligned_file = SequenceAligner.used_dir / SequenceAligner.aligned_pattern.format(
+        aligned_file = config.FASTA_DIR / SequenceAligner.aligned_pattern.format(
             tag=self.tag, file_id=self.already_aligned_file_id)
-        output_file = SequenceAligner.used_dir / SequenceAligner.aligned_pattern.format(
+        output_file = config.FASTA_DIR / SequenceAligner.aligned_pattern.format(
             tag=self.tag, file_id=self.file_id)
         print('Executing sequences alignment...')
         command = f'mafft --add {unaligned_file} --reorder {aligned_file} > {output_file}'
@@ -272,3 +281,53 @@ class Filter:
         :return: [boolean] true iff the string to check contains none of the keywords
         """
         return not any([key_word in string_to_check for key_word in self.key_words])
+
+
+def _get_aligned_content_by_tag(tag):
+    file = config.FASTA_DIR / f'{tag}_aligned'
+    try:
+        with open(file, 'r') as f:
+            return f.read()
+
+    except FileNotFoundError:
+        print(f'no alignment with tag {tag}')
+        return None
+
+
+def aligned_records_by_tag(tag):
+    content = _get_aligned_content_by_tag(tag)
+    if content is None:
+        return None
+
+    raw_records = content.split('>')[1:]
+    records = []
+    for raw_record in raw_records:
+        header, sequence = raw_record.split('\n', 1)
+        records.append({'header': header, 'sequence': sequence.replace('\n', '')})
+
+    return records
+
+
+def analyse_alignment(aligned_records):
+    sequences = [record['sequence'] for record in aligned_records]
+    lengths = [len(seq) for seq in sequences]
+    if max(lengths) != min(lengths):
+        print('sequences don\'t have same length')
+        return
+
+    num_gaps = np.zeros(lengths[0], dtype=int)
+    num_variation = np.zeros(lengths[0], dtype=int)
+    for site in range(lengths[0]):
+        num_nucleotides = {}
+        for seq in sequences:
+            c = seq[site]
+            if c == '-':
+                num_gaps[site] += 1
+            else: # also counting N or X as but not gaps as variation
+                num_nucleotides[c] = True
+
+        print(num_nucleotides)
+        num_variation[site] = len(num_nucleotides)
+
+    return num_gaps, num_variation
+
