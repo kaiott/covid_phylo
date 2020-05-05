@@ -76,6 +76,10 @@ class SequenceAligner:
             print('no unaligned sequences')
             return
 
+        if len(sequence_ids_written) == 1:
+            print('only one sequence')
+            return
+
         print(f'will align {len(sequence_ids_written)} new sequences')
 
         if self.already_aligned_file_id is None:
@@ -86,7 +90,7 @@ class SequenceAligner:
             self._align_from_existing()
 
         if make_copy:
-            self._copy_aligned_file_unstamped()
+            self.copy_aligned_file_unstamped()
 
         # at this point assume alignment done successfully
         # update meta information
@@ -98,12 +102,15 @@ class SequenceAligner:
         with open(SequenceAligner.used_dir / info_filename, 'w') as file:
             file.write(json.dumps(info_dict))
 
-    def _copy_aligned_file_unstamped(self):
-        in_filename = SequenceAligner.used_dir / self.get_aligned_filename()
-        out_filename = SequenceAligner.used_dir / f'{self.tag}_aligned'
-        with open(in_filename, 'r') as in_file, open(out_filename, 'w') as out_file:
-            content = in_file.read()
-            out_file.write(content)
+    def copy_aligned_file_unstamped(self):
+        try:
+            in_filename = SequenceAligner.used_dir / self.get_aligned_filename()
+            out_filename = SequenceAligner.used_dir / f'{self.tag}_aligned'
+            with open(in_filename, 'r') as in_file, open(out_filename, 'w') as out_file:
+                content = in_file.read()
+                out_file.write(content)
+        except FileNotFoundError:
+            print('warning file not found, nothing copied')
 
     def get_aligned_filename(self):
         """
@@ -113,6 +120,18 @@ class SequenceAligner:
         """
         return SequenceAligner.aligned_pattern.format(tag=self.tag,
                                                       file_id=self.already_aligned_file_id)
+
+    @staticmethod
+    def get_filename_by_tag(tag):
+        """
+        DESCRIPTION:
+        Returns the name of the file with the most recently aligned sequences of that tag
+        :return: [string] the filename or None if no such file exists
+        """
+        file_id, x = SequenceAligner.get_actual(tag)
+        if file_id is None:
+            return None
+        return SequenceAligner.aligned_pattern.format(selection_specifier=tag, file_id=file_id)	
 
     @staticmethod
     def get_actual(tag):
@@ -195,9 +214,8 @@ class SequenceAligner:
         stdout, stderr = mafft_cline()
         print('Alignment completed')
         # Write result into file
-        file = open(destname, 'w')
-        file.write(stdout)
-        file.close()
+        with open(destname, 'w') as file:
+            file.write(stdout)
         print('Alignment saved')
 
     def _align_from_existing(self):
